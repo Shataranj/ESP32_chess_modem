@@ -24,8 +24,8 @@ AutoConnectConfig config;
 rgb_lcd lcd;
 
 const int colorR = 255;
-const int colorG = 255;
-const int colorB = 255;
+const int colorG = 102;
+const int colorB = 178;
 
 String inputString = "";
 HTTPClient http, http2;
@@ -45,7 +45,9 @@ void setup() {
   Portal.config(config);  
 
   if (Portal.begin()) { 
-    Serial.println("HTTP server:" + WiFi.localIP().toString()); 
+    Serial.println("HTTP server:" + WiFi.localIP().toString());
+    Serial.println("WIFI name:" + WiFi.SSID());
+    
   }
   config.apip = WiFi.localIP();
   Portal.config(config); 
@@ -56,8 +58,9 @@ void setup() {
     lcd.begin(16, 2);
     lcd.setRGB(colorR, colorG, colorB);
     lcd.print("Let's Play Chess");
-
-    delay(1000);
+    lcd.setCursor(0, 1);
+    lcd.print("Set attributes..");
+    delay(3000);
 
 }
 
@@ -66,83 +69,313 @@ void loop() {
   if ((WiFi.status() == WL_CONNECTED)) {
       
       Serial.println("I got Connected");
-      String moveCombination[2];
-      String userMove = "";
-      int count = 0;
-      String chessEngineMoves = "";
+      boolean game_setup = false;
+      boolean level_setup = false;
+      boolean color_setup = false;
+      boolean game_over = false;
+      int level_count = 0;
+      String color = "";
+      String game_id = "";
+
+      lcd.clear();
+      lcd.print("Set Level:");
       
+
+      //Set Level
       do{
         if (Serial.available() > 0) {
-          inputString = removeLastChar(Serial.readStringUntil('\n'));
+          inputString = "";
+          inputString = Serial.readStringUntil('\n');
+          inputString.trim();
+          // Serial.flush();
 
-          if(moveCombination[count - 1] != inputString){
-            moveCombination[count]=inputString;
-            count++;
+          if (inputString == ">"){
+            level_count = level_count + 1;
+            level_count = (level_count <= 15) ? level_count : 15;
+            lcd.clear();
+            lcd.print("Set Level:");
+            lcd.setCursor(0, 1);
+            lcd.print(String(level_count));
           }
+          else if(inputString == "<")
+          {
+            level_count = level_count - 1;
+            level_count = (level_count <= 0) ? 0 : level_count;
+            lcd.clear();
+            lcd.print("Set Level:");
+            lcd.setCursor(0, 1);
+            lcd.print(String(level_count));
+          }
+          else if(inputString == "OK"){
+            lcd.clear();
+            lcd.print("Level Set to:");
+            lcd.setCursor(0, 1);
+            lcd.print("Level:" + String(level_count));
+            level_setup = true;
+          }
+
+          Serial.flush();
+        }
+      } while (level_setup == false);
+
+      delay(1000);
+
+      Serial.flush();
+      lcd.clear();
+      lcd.print("Choose Color:");
+      lcd.setCursor(0, 1);
+      lcd.print("[>]WHITE[<]BLACK");
+      lcd.leftToRight();
+
+      //Set Color
+      do{
+        if (Serial.available() > 0) {
+          inputString = "";
+          inputString = Serial.readStringUntil('\n');
+          inputString.trim();
+          // Serial.flush();
+          
+          if (inputString == ">"){
+            color = "white";
+            lcd.clear();
+            lcd.print("Set Color:");
+            lcd.setCursor(0, 1);
+            lcd.print(color);
+          }
+          else if(inputString == "<")
+          {
+            color = "black";
+            lcd.clear();
+            lcd.print("Set Color:");
+            lcd.setCursor(0, 1);
+            lcd.print(color);
+          }
+          else if(inputString == "OK"){
+            lcd.clear();
+            lcd.print("Color Set to:");
+            lcd.setCursor(0, 1);
+            lcd.print("Color:" + color);
+            color_setup = true;
+          }
+
+          Serial.flush();
+        }
+      } while (color_setup == false);
+
+      //Start a game
+      String board_id = "rolling-pawn-chess-board-jd";
+
+      Serial.println("********************************************");
+      Serial.println("Starting a Game . .");
+      Serial.println("********************************************");      
+      http.begin("http://rolling-pawn-chess.herokuapp.com/create_game");
+      http.addHeader("Content-Type", "application/json");
+
+      StaticJsonDocument<200> create_request;
+
+      create_request["board_id"] = board_id;
+      create_request["with_engine"] = "true";
+      create_request["color"] = color;
+      create_request["engine_level"] = String(level_count);
+    
+      char json_str[600];
+      serializeJsonPretty(create_request, json_str);
+      Serial.println(json_str);
+
+      int httpResponseCode = http.POST(json_str);
+      Serial.println("HTTP STATUS:" + String(httpResponseCode));
+
+      if(httpResponseCode>0){
+        Serial.println("*******************   Game Started    **********************");
+        String response_ui = http.getString();
+        
+        DynamicJsonDocument create_response(2048);
+        deserializeJson(create_response, response_ui);
+
+        game_id = create_response["game_id"].as<String>();
+
+        if (color == "white")
+        {
+          lcd.clear();
+          lcd.print("Game Started");
+          lcd.setCursor(0, 1);
+          lcd.print("Waiting for your move");
+        }else{
+          lcd.clear();
+          lcd.print("Game Started:");
+          lcd.setCursor(0, 1);
+          lcd.print("Engine Move:" + create_response["initial_move"]["engine_move"]["from"].as<String>() + create_response["initial_move"]["engine_move"]["to"].as<String>());
+
+          Serial.println("********************************************");
+          Serial.println("Sending move to UI");
+          Serial.println("********************************************");
+
+          http.begin("https://rolling-pawn.herokuapp.com/move"); // This was JD's local machine. We need to host it on heroku
+          http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+          String payload_ui = "from=" + create_response["initial_move"]["engine_move"]["from"].as<String>() + "&to=" + create_response["initial_move"]["engine_move"]["to"].as<String>();
+          int httpResponseCode_ui = http.POST(payload_ui);
+          String response_ui = http.getString();
+          if(httpResponseCode_ui>0){
+
+            Serial.println("*******************   SENT MOVE TO UI     **********************");
+            Serial.println(response_ui); 
+            Serial.println("******************************************************************");
+        
+          }else{
+        
+            Serial.println("ERROR SENDING REQUEST TO UI");
+            Serial.println(response_ui); 
+          }
+
+          http.end();     
         } 
 
-      } while(count < 2);
-      userMove = createUserMove(moveCombination[0], moveCombination[1]);
-
-      Serial.println("Your move is:" + userMove);
-
-      Serial.println("********************************************");
-      Serial.println("Sending move to UI");
-      Serial.println("********************************************");
-
-      http.begin("http://192.168.1.8:3000/move"); // This was JD's local machine. We need to host it on heroku
-      http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-
-      String payload_ui = "from=" + (moveCombination[0]) + "&to=" + (moveCombination[1]);
-      int httpResponseCode_ui = http.POST(payload_ui);
-      String response_ui = http.getString();
-      if(httpResponseCode_ui>0){
-
-        Serial.println("*******************   SENT MOVE TO UI     **********************");
-        Serial.println(response_ui); 
-        Serial.println("******************************************************************");
-    
-      }else{
-    
-        Serial.println("ERROR SENDING REQUEST TO UI");
-        Serial.println(response_ui); 
-      }
-
-      http.end();
-    
-
-      Serial.println("********************************************");
-      Serial.println("Asking chess engine for it's move . . . .");
-      Serial.println("********************************************");
-
-      http.begin("http://square-off.herokuapp.com/makeMove");
-      http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-
-      String payload = "from=" + (moveCombination[0]) + "&to=" + (moveCombination[1]) + "&gameId=5e6e92132c353f001465fe834";
-      Serial.println(payload);
-      int httpResponseCode = http.POST(payload);
-      DynamicJsonDocument doc(2048);
-      deserializeJson(doc, http.getStream());
-      if(httpResponseCode>0){
-
-        Serial.println("*******************   CHESS ENGINE MOVE     **********************");
-        // Serial.println(response); 
-        String ai_response = "FROM=" + doc["aiMove"]["from"].as<String>() + " TO=" + doc["aiMove"]["to"].as<String>();
-        Serial.println(ai_response);
-        lcd.clear();
-        lcd.print("Engine Move:");
-        lcd.setCursor(0, 1);
-        lcd.print(ai_response);
-        delay(100);
         Serial.println("******************************************************************");
     
       }else{
         Serial.println("ERROR SENDING REQUEST");
       }
-      
-      http.end();    
+
       Serial.flush();
-      Serial.println("READY FOR YOUR NEXT MOVE . . .");
+      //Gameplay
+
+      do{
+          String moveCombination[2];
+          String userMove = "";
+          int count = 0;
+          String chessEngineMoves = "";
+          String user_from_move = "";
+          String user_to_move = "";
+
+          do{
+            if (Serial.available() > 0) {
+              inputString = removeLastChar(Serial.readStringUntil('\n'));
+
+              if(moveCombination[count - 1] != inputString){
+                moveCombination[count]=inputString;
+                count++;
+              }
+            } 
+
+          } while(count < 2);
+          
+          user_from_move = moveCombination[0];
+          user_to_move = moveCombination[1];
+          userMove = createUserMove(user_from_move, user_to_move);
+
+          Serial.println("Your move is:" + userMove);
+          
+          Serial.println("********************************************");
+          Serial.println("Sending move to UI");
+          Serial.println("********************************************");
+
+          http.begin("https://rolling-pawn.herokuapp.com/move"); // This was JD's local machine. We need to host it on heroku
+          http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+          String payload_ui = "from=" + user_from_move + "&to=" + user_to_move;
+          int httpResponseCode_ui = http.POST(payload_ui);
+          String response_ui = http.getString();
+          if(httpResponseCode_ui>0){
+
+            Serial.println("*******************   SENT MOVE TO UI     **********************");
+            Serial.println(response_ui); 
+            Serial.println("******************************************************************");
+        
+          }else{
+        
+            Serial.println("ERROR SENDING REQUEST TO UI");
+            Serial.println(response_ui); 
+          }
+
+          http.end();            
+
+          Serial.println("********************************************");
+          Serial.println("Asking chess engine for it's move . . . .");
+          Serial.println("********************************************");
+
+          http.begin("https://rolling-pawn-chess.herokuapp.com/play");
+          http.addHeader("Content-Type", "application/json");
+
+          StaticJsonDocument<200> gameplay_request;
+
+          gameplay_request["game_id"] = game_id;
+          gameplay_request["from"] = user_from_move;
+          gameplay_request["to"] = user_to_move;
+          
+          char json_str_gameplay_req[600];
+          serializeJsonPretty(gameplay_request, json_str_gameplay_req);
+
+          Serial.println(json_str_gameplay_req);
+
+          int httpResponseCode_gameplay = http.POST(json_str_gameplay_req);
+          Serial.println("HTTP STATUS:" + String(httpResponseCode_gameplay));
+          
+          if(httpResponseCode_gameplay>0){
+
+            Serial.println("*******************   CHESS ENGINE MOVE     **********************");
+            String gameplay_response = http.getString();
+            Serial.println(gameplay_response);
+
+            DynamicJsonDocument gameplay_response_doc(2048);
+            deserializeJson(gameplay_response_doc, gameplay_response);
+
+            game_over = gameplay_response_doc["game_over"].as<boolean>();
+
+            if (game_over)
+            {
+              lcd.clear();
+              lcd.print("Game Ended");
+              lcd.setCursor(0, 1);
+              lcd.print("Start a new game");
+            }else{
+              lcd.clear();
+              lcd.print("Engine Move:");
+              lcd.setCursor(0, 1);
+              lcd.print("FROM:" + gameplay_response_doc["engine_move"]["from"].as<String>() + "TO:" + gameplay_response_doc["engine_move"]["to"].as<String>());
+
+              Serial.println("********************************************");
+              Serial.println("Sending move to UI");
+              Serial.println("********************************************");
+
+              http.begin("https://rolling-pawn.herokuapp.com/move"); // This was JD's local machine. We need to host it on heroku
+              http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+              String payload_ui = "from=" + gameplay_response_doc["engine_move"]["from"].as<String>() + "&to=" + gameplay_response_doc["engine_move"]["to"].as<String>();
+              int httpResponseCode_ui = http.POST(payload_ui);
+              String response_ui = http.getString();
+              if(httpResponseCode_ui>0){
+
+                Serial.println("*******************   SENT MOVE TO UI     **********************");
+                Serial.println(response_ui); 
+                Serial.println("******************************************************************");
+            
+              }else{
+            
+                Serial.println("ERROR SENDING REQUEST TO UI");
+                Serial.println(response_ui); 
+              }
+
+              http.end();  
+
+            }
+
+            delay(2000);
+
+
+            Serial.println("******************************************************************");
+        
+          }else{
+            Serial.println("ERROR SENDING REQUEST");
+          }
+
+          http.end();    
+          Serial.flush();
+          Serial.println("READY FOR YOUR NEXT MOVE . . .");
+
+      } while (game_over == false);
+
+      Serial.println("Game Ended!"); 
       }
 
 }
