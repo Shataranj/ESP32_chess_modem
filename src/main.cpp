@@ -17,6 +17,7 @@
 #include <Wire.h>
 #include "rgb_lcd.h"
 #include <ArduinoJson.h>
+#include <LevelSetup.h>
 
 AutoConnect Portal;
 AutoConnectConfig config;
@@ -69,54 +70,13 @@ void loop() {
   if ((WiFi.status() == WL_CONNECTED)) {
       
       Serial.println("I got Connected");
-      boolean game_setup = false;
-      boolean level_setup = false;
       boolean color_setup = false;
       boolean game_over = false;
-      int level_count = 0;
       String color = "";
       String game_id = "";
 
-      lcd.clear();
-      lcd.print("Set Level:");
-      
-
-      //Set Level
-      do{
-        if (Serial.available() > 0) {
-          inputString = "";
-          inputString = Serial.readStringUntil('\n');
-          inputString.trim();
-          // Serial.flush();
-
-          if (inputString == ">"){
-            level_count = level_count + 1;
-            level_count = (level_count <= 15) ? level_count : 15;
-            lcd.clear();
-            lcd.print("Set Level:");
-            lcd.setCursor(0, 1);
-            lcd.print(String(level_count));
-          }
-          else if(inputString == "<")
-          {
-            level_count = level_count - 1;
-            level_count = (level_count <= 0) ? 0 : level_count;
-            lcd.clear();
-            lcd.print("Set Level:");
-            lcd.setCursor(0, 1);
-            lcd.print(String(level_count));
-          }
-          else if(inputString == "OK"){
-            lcd.clear();
-            lcd.print("Level Set to:");
-            lcd.setCursor(0, 1);
-            lcd.print("Level:" + String(level_count));
-            level_setup = true;
-          }
-
-          Serial.flush();
-        }
-      } while (level_setup == false);
+      LevelSetup levelSetup = new LevelSetup(0, lcd);
+      int level_count = levelSetup.doSetup();
 
       delay(1000);
 
@@ -338,7 +298,7 @@ void loop() {
               Serial.println("Sending move to UI");
               Serial.println("********************************************");
 
-              http.begin("https://rolling-pawn.herokuapp.com/move"); // This was JD's local machine. We need to host it on heroku
+              http.begin("https://rolling-pawn.herokuapp.com/move");
               http.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
               String payload_ui = "from=" + gameplay_response_doc["engine_move"]["from"].as<String>() + "&to=" + gameplay_response_doc["engine_move"]["to"].as<String>();
