@@ -17,7 +17,9 @@
 #include <Wire.h>
 #include "rgb_lcd.h"
 #include <ArduinoJson.h>
+#include <ValueSetup.h>
 #include <LevelSetup.h>
+#include <ColorSetup.h>
 
 AutoConnect Portal;
 AutoConnectConfig config;
@@ -70,57 +72,17 @@ void loop() {
   if ((WiFi.status() == WL_CONNECTED)) {
       
       Serial.println("I got Connected");
-      boolean color_setup = false;
       boolean game_over = false;
-      String color = "";
       String game_id = "";
 
       LevelSetup levelSetup(0, lcd);
       int level_count = levelSetup.doSetup();
 
       delay(1000);
-
       Serial.flush();
-      lcd.clear();
-      lcd.print("Choose Color:");
-      lcd.setCursor(0, 1);
-      lcd.print("[>]WHITE[<]BLACK");
-      lcd.leftToRight();
-
-      //Set Color
-      do{
-        if (Serial.available() > 0) {
-          inputString = "";
-          inputString = Serial.readStringUntil('\n');
-          inputString.trim();
-          // Serial.flush();
-          
-          if (inputString == ">"){
-            color = "white";
-            lcd.clear();
-            lcd.print("Set Color:");
-            lcd.setCursor(0, 1);
-            lcd.print(color);
-          }
-          else if(inputString == "<")
-          {
-            color = "black";
-            lcd.clear();
-            lcd.print("Set Color:");
-            lcd.setCursor(0, 1);
-            lcd.print(color);
-          }
-          else if(inputString == "OK"){
-            lcd.clear();
-            lcd.print("Color Set to:");
-            lcd.setCursor(0, 1);
-            lcd.print("Color:" + color);
-            color_setup = true;
-          }
-
-          Serial.flush();
-        }
-      } while (color_setup == false);
+    
+      ColorSetup colorSetup("white", lcd);
+      String color = colorSetup.doSetup();
 
       //Start a game
       String board_id = "rolling-pawn-chess-board-jd";

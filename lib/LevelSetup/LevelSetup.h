@@ -1,24 +1,17 @@
 #ifndef LevelSetup_h
 #define LevelSetup_h
 
-#include "Arduino.h"
 #include "rgb_lcd.h"
+#include "ValueSetup.h"
 
-class LevelSetup
+class LevelSetup : public ValueSetup<int>
 {
 public:
   LevelSetup(int initial, rgb_lcd lcd);
-  int doSetup();
 
 private:
-  rgb_lcd _lcd;
-  int _level;
-  void printMessage(String first_part, String second_part);
-  void printLevelSetToMessage();
-  void printSetLevelMessage();
-  void decreaseLevel();
-  void increaseLevel();
-  void setLevel(int new_level);
+  void onPressLeft();
+  void onPressRight();
 };
 
 #endif
