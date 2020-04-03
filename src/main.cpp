@@ -21,13 +21,11 @@
 #include <LevelSetup.h>
 #include <ColorSetup.h>
 #include <ESPRandom.h>
-#include <EEPROM.h>
-
-//Size in bytes
-#define EEPROM_SIZE 16
+#include <Preferences.h>
 
 AutoConnect Portal;
 AutoConnectConfig config;
+Preferences prefs;
 
 rgb_lcd lcd;
 
@@ -95,7 +93,6 @@ void loop()
 
     ColorSetup colorSetup("white", lcd);
     String color = colorSetup.doSetup();
-
 
     Serial.println("********************************************");
     Serial.println("Starting a Game . .");
@@ -346,19 +343,17 @@ String removeLastChar(String input)
 //Generates a Board ID on first start and returns it
 String generateOrReadBoardID()
 {
-  if (!EEPROM.begin(EEPROM_SIZE))
+  prefs.begin("rolling-pawns"); //Namespace is limited to 15 chars
+  const char key[] = {'b', 'o', 'a', 'r', 'd', '-', 'i', 'd'};
+  String boardID = prefs.getString(key, "NOT_FOUND"); //Returns NOT_FOUND if board id is not already stored
+  const bool isBoardIDStored = !(boardID == "NOT_FOUND");
+  if (isBoardIDStored)
   {
-    Serial.println("Failed to initialize EEPROM");
-    delay(1000000);
+    return boardID;
   }
-
   uint8_t buffer[16];
   ESPRandom::uuid(buffer);
-  const String boardID = ESPRandom::uuidToString(buffer);
-  if (boardID == "")
-  {
-    Serial.println("Failed to initialize EEPROM");
-    delay(1000000);
-  }
-  return boardID;
+  String newBoardID = ESPRandom::uuidToString(buffer);
+  prefs.putString(key, newBoardID);
+  return newBoardID;
 }
