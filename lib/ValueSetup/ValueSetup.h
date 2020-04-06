@@ -16,8 +16,10 @@ public:
 
 protected:
   T _value;
+  void printMessage(String first_part, String second_part);
   virtual void onPressLeft() = 0;
   virtual void onPressRight() = 0;
+  virtual void printInitialMessage() = 0;
 
 private:
   rgb_lcd _lcd;
@@ -25,7 +27,6 @@ private:
   String _buttonLeft = "<";
   String _buttonRight = ">";
   String _buttonOK = "OK";
-  void printMessage(String first_part, String second_part);
   void printValueSetToMessage();
   void printSetValueMessage();
 };

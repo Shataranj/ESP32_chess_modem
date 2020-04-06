@@ -12,6 +12,7 @@ public:
 private:
   void onPressLeft();
   void onPressRight();
+  void printInitialMessage();
 };
 
 #endif

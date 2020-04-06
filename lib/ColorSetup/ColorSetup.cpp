@@ -13,3 +13,8 @@ void ColorSetup::onPressLeft()
 {
   _value = "black";
 }
+
+void ColorSetup::printInitialMessage()
+{
+  printMessage("Choose Colour:", "[>]WHITE[<]BLACK");
+}

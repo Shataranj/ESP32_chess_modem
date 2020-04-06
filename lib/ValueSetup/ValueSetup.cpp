@@ -13,7 +13,7 @@ ValueSetup<T>::ValueSetup(String valueName, T initial, rgb_lcd lcd)
 template <typename T>
 T ValueSetup<T>::doSetup()
 {
-  printSetValueMessage();
+  printInitialMessage();
   while (true)
   {
     if (Serial.available() > 0)
