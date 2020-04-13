@@ -1,13 +1,13 @@
-#ifndef LevelSetup_h
-#define LevelSetup_h
+#ifndef ColorSetup_h
+#define ColorSetup_h
 
 #include "rgb_lcd.h"
 #include "ValueSetup.h"
 
-class LevelSetup : public ValueSetup<int>
+class ColorSetup : public ValueSetup<String>
 {
 public:
-  LevelSetup(int initial, rgb_lcd lcd);
+  ColorSetup(String initial, rgb_lcd lcd);
 
 private:
   void onPressLeft();
